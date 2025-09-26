@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aventura das Cores e Formas</title>
+
+    <style>
+        /* =========================================== */
+        /* CSS EMBUTIDO (style.css) */
+        /* =========================================== */
+        :root {
+            /* Cores do Jogo (Fácil alteração) */
+            --color-red: #ff4136;
+            --color-blue: #0074d9;
+            --color-yellow: #ffdc00;
+            --color-green: #2ecc40;
+            --color-background: #f0f8ff; /* Azul claro suave */
+            --color-success: #ff851b; /* Laranja para feedback */
+        }
+
+        body {
+            font-family: sans-serif;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background-color: var(--color-background);
+            user-select: none; /* Previne seleção de texto em dispositivos móveis */
+        }
+
+        .game-container {
+            width: 100%;
+            max-width: 800px;
+            text-align: center;
+        }
+
+        /* Estilo para a Pontuação */
+        .score-display {
+            font-size: 24px;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 20px;
+            padding: 10px;
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        /* Área de Instrução - Robô-Tô e Alvo */
+        .instruction-area {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-bottom: 40px;
+        }
+
+        .robo-to {
+            font-size: 80px; /* Ícone grande */
+            margin-bottom: 15px;
+            transition: transform 0.5s ease-in-out; /* Para animação de nível */
+        }
+
+        /* Indicador do Alvo (A cor que precisa ser encontrada) */
+        .target-indicator {
+            width: 100px;
+            height: 100px;
+            border-radius: 50%; /* Faz um círculo */
+            border: 8px dashed #333;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 40px;
+            font-weight: bold;
+            color: white;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            transition: transform 0.3s ease;
+        }
+
+        /* Opções de Resposta (Grid para responsividade) */
+        .options-container {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr); /* Padrão mobile */
+            gap: 30px;
+            transition: grid-template-columns 0.3s ease;
+        }
+
+        /* Botões de Cores (Elementos grandes e fáceis de tocar) */
+        .color-option {
+            width: 100%;
+            padding-bottom: 100%; 
+            border: none;
+            border-radius: 20px;
+            cursor: pointer;
+            transition: transform 0.1s ease, opacity 0.3s ease;
+            box-shadow: 0 8px 0 rgba(0, 0, 0, 0.2);
+            position: relative; 
+        }
+
+        .color-option:active {
+            /* Feedback tátil ao tocar/clicar */
+            transform: translateY(4px); 
+            box-shadow: 0 4px 0 rgba(0, 0, 0, 0.2);
+        }
+
+        /* Animação de Acerto */
+        .correct-animation {
+            animation: bounceScale 0.5s ease forwards;
+        }
+
+        @keyframes bounceScale {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+
+        /* Animação de Erro (Balanço simples) */
+        .wrong-shake {
+            animation: shake 0.3s ease-in-out;
+        }
+
+        @keyframes shake {
+            0% { transform: translateX(0); }
+            25% { transform: translateX(-10px); }
+            50% { transform: translateX(10px); }
+            75% { transform: translateX(-5px); }
+            100% { transform: translateX(0); }
+        }
+
+        /* Mensagens de Feedback */
+        .feedback-message {
+            font-size: 40px;
+            font-weight: bold;
+            color: var(--color-success);
+            margin-top: 30px;
+            min-height: 50px;
+        }
+
+        /* Responsividade para telas maiores que mobile */
+        @media (min-width: 600px) {
+            .options-container {
+                grid-template-columns: repeat(4, 1fr); 
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <main class="game-container">
+        
+        <div id="score-display" class="score-display">Pontos: 0</div>
+        
+        <header class="instruction-area">
+            <div id="robo-to" class="robo-to">🤖</div>
+            <div id="target-indicator" class="target-indicator">?</div>
+        </header>
+
+        <section id="options-container" class="options-container">
+            </section>
+
+        <div id="feedback-message" class="feedback-message"></div>
+
+    </main>
+
+    <script>
+        /* =========================================== */
+        /* JAVASCRIPT EMBUTIDO (script.js) */
+        /* =========================================== */
+
+        // ===========================================
+        // CONFIGURAÇÕES GLOBAIS
+        // ===========================================
+        const COLORS = {
+            'vermelho': '#ff4136', 
+            'azul': '#0074d9',
+            'amarelo': '#ffdc00',
+            'verde': '#2ecc40',
+            'laranja': '#ff8c00', 
+            'roxo': '#800080',    
+        };
+        const ALL_COLORS = Object.keys(COLORS);
+        const WIN_SCORE = 5; // <--- ALTERADO DE 10 PARA 5
+        let score = 0;
+        let targetColor = '';
+
+        // Define as cores iniciais (Nível 1)
+        let currentLevelColors = ALL_COLORS.slice(0, 3); 
+
+        // ===========================================
+        // SELETORES DO DOM
+        // ===========================================
+        const optionsContainer = document.getElementById('options-container');
+        const targetIndicator = document.getElementById('target-indicator');
+        const feedbackMessage = document.getElementById('feedback-message');
+        const scoreDisplay = document.getElementById('score-display'); 
+
+        // ===========================================
+        // FUNÇÕES DE ÁUDIO E FEEDBACK (COM SUPORTE A ARQUIVOS)
+        // ===========================================
+        
+        // Pré-carrega os objetos de áudio (certifique-se de que acerto.mp3 e erro.mp3 estão no mesmo diretório)
+        const audioAcerto = new Audio('sounds/acerto.mp3'); 
+        const audioErro = new Audio('sounds/erro.mp3');
+        const audioNivelUp = new Audio('sounds/nivel_up.mp3'); 
+
+        const getAudioFile = (type) => {
+             if (type === 'acerto') return audioAcerto;
+             if (type === 'erro') return audioErro;
+             if (type === 'nivel_up') return audioNivelUp;
+             return null;
+        }
+        
+        const updateScoreDisplay = () => {
+            scoreDisplay.textContent = `Pontos: ${score}`;
+        };
+
+        const playSound = (type) => {
+            const audio = getAudioFile(type);
+            if (audio) {
+                 audio.currentTime = 0; 
+                 audio.play().catch(e => {
+                     console.log(`Erro ao tocar áudio (${type}): ${e.message}`);
+                 });
+            }
+            
+            if (type === 'acerto') {
+                feedbackMessage.textContent = '🥳 ACERTOU! 🌟';
+                setTimeout(() => feedbackMessage.textContent = '', 800);
+            } else if (type === 'erro') {
+                feedbackMessage.textContent = '❌ Tente Novamente!';
+                setTimeout(() => feedbackMessage.textContent = '', 800);
+            } else if (type === 'nivel_up') {
+                feedbackMessage.textContent = '🚀 NOVO NÍVEL DESBLOQUEADO!';
+                document.getElementById('robo-to').style.transform = 'scale(1.2) rotate(360deg)'; 
+                setTimeout(() => {
+                    feedbackMessage.textContent = '';
+                    document.getElementById('robo-to').style.transform = 'none';
+                }, 1500);
+            }
+        };
+
+        // ===========================================
+        // LÓGICA DE PROGRESSÃO DE FASE
+        // ===========================================
+
+        const nextLevel = () => {
+            playSound('nivel_up');
+            
+            if (currentLevelColors.length < ALL_COLORS.length) {
+                currentLevelColors = ALL_COLORS.slice(0, currentLevelColors.length + 1); 
+                console.log(`Transição para Nível ${currentLevelColors.length - 2} (${currentLevelColors.length} Cores)`);
+            } else {
+                console.log("Fim das fases de cor!");
+            }
+
+            score = 0;
+            updateScoreDisplay();
+            startRound();
+        };
+
+        // ===========================================
+        // LÓGICA DO JOGO (START ROUND)
+        // ===========================================
+
+        const shuffleArray = (array) => {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+            return array;
+        };
+
+        const startRound = () => {
+            const availableColors = shuffleArray([...currentLevelColors]); 
+            targetColor = availableColors[Math.floor(Math.random() * availableColors.length)];
+            
+            targetIndicator.style.backgroundColor = COLORS[targetColor];
+            targetIndicator.textContent = '❓';
+            
+            renderOptions(availableColors);
+        };
+
+        const renderOptions = (colors) => {
+            optionsContainer.innerHTML = ''; 
+            
+            const numCols = colors.length >= 5 ? 3 : 2; 
+            optionsContainer.style.gridTemplateColumns = `repeat(${numCols}, 1fr)`;
+
+            colors.forEach(colorName => {
+                const button = document.createElement('button');
+                button.className = 'color-option';
+                button.style.backgroundColor = COLORS[colorName];
+                button.setAttribute('data-color', colorName);
+                button.addEventListener('click', handleChoice);
+                optionsContainer.appendChild(button);
+            });
+        };
+
+        const handleChoice = (event) => {
+            const selectedButton = event.currentTarget;
+            const selectedColor = selectedButton.getAttribute('data-color');
+            
+            optionsContainer.style.pointerEvents = 'none';
+            const timeoutDuration = 1000;
+
+            if (selectedColor === targetColor) {
+                score++;
+                updateScoreDisplay();
+                playSound('acerto');
+                selectedButton.classList.add('correct-animation');
+                
+                if (score >= WIN_SCORE) { // <--- VERIFICAÇÃO COM O NOVO VALOR (5)
+                    setTimeout(() => {
+                        nextLevel(); 
+                        optionsContainer.style.pointerEvents = 'auto';
+                    }, timeoutDuration);
+                } else {
+                    setTimeout(() => {
+                        selectedButton.classList.remove('correct-animation');
+                        optionsContainer.style.pointerEvents = 'auto';
+                        startRound(); 
+                    }, timeoutDuration);
+                }
+
+            } else {
+                playSound('erro');
+                selectedButton.classList.add('wrong-shake');
+                
+                setTimeout(() => {
+                    selectedButton.classList.remove('wrong-shake');
+                    optionsContainer.style.pointerEvents = 'auto'; 
+                }, 500);
+            }
+        };
+
+        // ===========================================
+        // INICIALIZAÇÃO
+        // ===========================================
+        document.addEventListener('DOMContentLoaded', () => {
+            updateScoreDisplay(); 
+            startRound();
+        });
+    </script>
+</body>
+</html>
