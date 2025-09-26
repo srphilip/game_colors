@@ -15,8 +15,10 @@
             --color-blue: #0074d9;
             --color-yellow: #ffdc00;
             --color-green: #2ecc40;
-            --color-background: #f0f8ff; /* Azul claro suave */
-            --color-success: #ff851b; /* Laranja para feedback */
+            --color-orange: #ff8c00; 
+            --color-purple: #800080; 
+            --color-background: #f0f8ff; 
+            --color-success: #ff851b;
         }
 
         body {
@@ -28,7 +30,7 @@
             align-items: center;
             min-height: 100vh;
             background-color: var(--color-background);
-            user-select: none; /* Previne seleção de texto em dispositivos móveis */
+            user-select: none;
         }
 
         .game-container {
@@ -37,7 +39,6 @@
             text-align: center;
         }
 
-        /* Estilo para a Pontuação */
         .score-display {
             font-size: 24px;
             font-weight: bold;
@@ -49,7 +50,6 @@
             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
         }
 
-        /* Área de Instrução - Robô-Tô e Alvo */
         .instruction-area {
             display: flex;
             flex-direction: column;
@@ -58,16 +58,15 @@
         }
 
         .robo-to {
-            font-size: 80px; /* Ícone grande */
+            font-size: 80px; 
             margin-bottom: 15px;
-            transition: transform 0.5s ease-in-out; /* Para animação de nível */
+            transition: transform 0.5s ease-in-out;
         }
 
-        /* Indicador do Alvo (A cor que precisa ser encontrada) */
         .target-indicator {
             width: 100px;
             height: 100px;
-            border-radius: 50%; /* Faz um círculo */
+            border-radius: 50%;
             border: 8px dashed #333;
             display: flex;
             justify-content: center;
@@ -79,15 +78,13 @@
             transition: transform 0.3s ease;
         }
 
-        /* Opções de Resposta (Grid para responsividade) */
         .options-container {
             display: grid;
-            grid-template-columns: repeat(2, 1fr); /* Padrão mobile */
+            grid-template-columns: repeat(2, 1fr);
             gap: 30px;
             transition: grid-template-columns 0.3s ease;
         }
 
-        /* Botões de Cores (Elementos grandes e fáceis de tocar) */
         .color-option {
             width: 100%;
             padding-bottom: 100%; 
@@ -96,16 +93,29 @@
             cursor: pointer;
             transition: transform 0.1s ease, opacity 0.3s ease;
             box-shadow: 0 8px 0 rgba(0, 0, 0, 0.2);
-            position: relative; 
+            position: relative;
+        }
+
+        /* Classe para os botões de Cor e Forma */
+        .shape-option {
+            border-radius: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        /* Estilo para as formas SVG */
+        .shape-svg {
+            width: 70%;
+            height: 70%;
+            fill: white; /* Cor da forma (o fundo do botão terá a cor principal) */
         }
 
         .color-option:active {
-            /* Feedback tátil ao tocar/clicar */
             transform: translateY(4px); 
             box-shadow: 0 4px 0 rgba(0, 0, 0, 0.2);
         }
 
-        /* Animação de Acerto */
         .correct-animation {
             animation: bounceScale 0.5s ease forwards;
         }
@@ -116,7 +126,6 @@
             100% { transform: scale(1); }
         }
 
-        /* Animação de Erro (Balanço simples) */
         .wrong-shake {
             animation: shake 0.3s ease-in-out;
         }
@@ -129,7 +138,6 @@
             100% { transform: translateX(0); }
         }
 
-        /* Mensagens de Feedback */
         .feedback-message {
             font-size: 40px;
             font-weight: bold;
@@ -138,7 +146,6 @@
             min-height: 50px;
         }
 
-        /* Responsividade para telas maiores que mobile */
         @media (min-width: 600px) {
             .options-container {
                 grid-template-columns: repeat(4, 1fr); 
@@ -166,7 +173,7 @@
 
     <script>
         /* =========================================== */
-        /* JAVASCRIPT EMBUTIDO (script.js) */
+        /* JAVASCRIPT EMBUTIDO (script.js) - Versão com Cores e Formas */
         /* =========================================== */
 
         // ===========================================
@@ -180,13 +187,29 @@
             'laranja': '#ff8c00', 
             'roxo': '#800080',    
         };
+
+        // NOVO: DEFINIÇÃO DE FORMAS (usando SVG)
+        const SHAPES = {
+            'quadrado': `<svg class="shape-svg" viewBox="0 0 100 100"><rect x="10" y="10" width="80" height="80"/></svg>`,
+            'triangulo': `<svg class="shape-svg" viewBox="0 0 100 100"><polygon points="50,10 90,90 10,90"/></svg>`,
+            'circulo': `<svg class="shape-svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="40"/></svg>`,
+        };
+
         const ALL_COLORS = Object.keys(COLORS);
-        const WIN_SCORE = 5; // <--- ALTERADO DE 10 PARA 5
+        const ALL_SHAPES = Object.keys(SHAPES);
+        const WIN_SCORE = 5; 
         let score = 0;
         let targetColor = '';
+        let targetShape = ''; // NOVO: ALVO DA FORMA
+        let gameMode = 'colors'; // NOVO: VARIÁVEL DE ESTADO DO JOGO ('colors' ou 'shapes')
 
-        // Define as cores iniciais (Nível 1)
+        let audioInitialized = false; 
+        let audioAcerto = null; 
+        let audioErro = null;
+        let audioNivelUp = null;
+
         let currentLevelColors = ALL_COLORS.slice(0, 3); 
+        let currentLevelShapes = ALL_SHAPES.slice(0, 3);
 
         // ===========================================
         // SELETORES DO DOM
@@ -197,13 +220,22 @@
         const scoreDisplay = document.getElementById('score-display'); 
 
         // ===========================================
-        // FUNÇÕES DE ÁUDIO E FEEDBACK (COM SUPORTE A ARQUIVOS)
+        // FUNÇÕES DE ÁUDIO E FEEDBACK
         // ===========================================
-        
-        // Pré-carrega os objetos de áudio (certifique-se de que acerto.mp3 e erro.mp3 estão no mesmo diretório)
-        const audioAcerto = new Audio('sounds/acerto.mp3'); 
-        const audioErro = new Audio('sounds/erro.mp3');
-        const audioNivelUp = new Audio('sounds/nivel_up.mp3'); 
+        const initAudio = () => {
+            if (audioInitialized) return;
+            audioAcerto = new Audio('sounds/acerto.mp3'); 
+            audioErro = new Audio('sounds/erro.mp3');
+            audioNivelUp = new Audio('sounds/nivel_up.mp3');
+            try {
+                const unlockAudio = new Audio();
+                unlockAudio.muted = true;
+                unlockAudio.play();
+            } catch (e) {
+                console.log("Erro ao tentar destravar o áudio:", e);
+            }
+            audioInitialized = true;
+        };
 
         const getAudioFile = (type) => {
              if (type === 'acerto') return audioAcerto;
@@ -217,12 +249,11 @@
         };
 
         const playSound = (type) => {
+            if (!audioInitialized) return;
             const audio = getAudioFile(type);
             if (audio) {
                  audio.currentTime = 0; 
-                 audio.play().catch(e => {
-                     console.log(`Erro ao tocar áudio (${type}): ${e.message}`);
-                 });
+                 audio.play().catch(e => {});
             }
             
             if (type === 'acerto') {
@@ -242,26 +273,36 @@
         };
 
         // ===========================================
-        // LÓGICA DE PROGRESSÃO DE FASE
+        // LÓGICA DE PROGRESSÃO
         // ===========================================
-
         const nextLevel = () => {
             playSound('nivel_up');
             
-            if (currentLevelColors.length < ALL_COLORS.length) {
-                currentLevelColors = ALL_COLORS.slice(0, currentLevelColors.length + 1); 
-                console.log(`Transição para Nível ${currentLevelColors.length - 2} (${currentLevelColors.length} Cores)`);
-            } else {
-                console.log("Fim das fases de cor!");
+            // VERIFICA SE ESTÁ NO FIM DA FASE DE CORES PARA MUDAR PARA A FASE DE FORMAS
+            if (gameMode === 'colors' && currentLevelColors.length === ALL_COLORS.length) {
+                gameMode = 'shapes';
+                score = 0;
+                updateScoreDisplay();
+                feedbackMessage.textContent = '✨ Agora, associe a Cor E a Forma! ✨';
+                setTimeout(() => {
+                    feedbackMessage.textContent = '';
+                    startRound();
+                }, 2000);
+                return;
             }
 
+            // Lógica para avançar a fase de cores
+            if (gameMode === 'colors' && currentLevelColors.length < ALL_COLORS.length) {
+                currentLevelColors = ALL_COLORS.slice(0, currentLevelColors.length + 1); 
+            }
+            
             score = 0;
             updateScoreDisplay();
             startRound();
         };
 
         // ===========================================
-        // LÓGICA DO JOGO (START ROUND)
+        // LÓGICA DO JOGO UNIFICADA PARA CORES E FORMAS
         // ===========================================
 
         const shuffleArray = (array) => {
@@ -276,42 +317,92 @@
             const availableColors = shuffleArray([...currentLevelColors]); 
             targetColor = availableColors[Math.floor(Math.random() * availableColors.length)];
             
-            targetIndicator.style.backgroundColor = COLORS[targetColor];
-            targetIndicator.textContent = '❓';
-            
-            renderOptions(availableColors);
+            // Lógica para a fase de formas
+            if (gameMode === 'shapes') {
+                const availableShapes = shuffleArray([...currentLevelShapes]);
+                targetShape = availableShapes[Math.floor(Math.random() * availableShapes.length)];
+
+                // Atualiza o indicador do alvo para mostrar a forma e a cor
+                targetIndicator.innerHTML = SHAPES[targetShape];
+                targetIndicator.style.backgroundColor = COLORS[targetColor];
+                targetIndicator.style.borderRadius = '20px'; // Para acomodar o quadrado
+            } else {
+                // Lógica para a fase de cores
+                targetIndicator.textContent = '❓';
+                targetIndicator.innerHTML = '';
+                targetIndicator.style.backgroundColor = COLORS[targetColor];
+                targetIndicator.style.borderRadius = '50%';
+            }
+
+            renderOptions(availableColors, ALL_SHAPES);
         };
 
-        const renderOptions = (colors) => {
+        const renderOptions = (colors, shapes) => {
             optionsContainer.innerHTML = ''; 
             
-            const numCols = colors.length >= 5 ? 3 : 2; 
-            optionsContainer.style.gridTemplateColumns = `repeat(${numCols}, 1fr)`;
+            // Ajusta o grid para 4 colunas se for a fase de cores ou formas
+            optionsContainer.style.gridTemplateColumns = `repeat(4, 1fr)`;
+            
+            if (gameMode === 'colors') {
+                // Cria opções apenas de cores
+                colors.forEach(colorName => {
+                    const button = document.createElement('button');
+                    button.className = 'color-option';
+                    button.style.backgroundColor = COLORS[colorName];
+                    button.setAttribute('data-color', colorName);
+                    button.addEventListener('click', handleChoice);
+                    optionsContainer.appendChild(button);
+                });
+            } else {
+                // Cria opções com cores e formas
+                const allCombinations = [];
+                colors.forEach(color => {
+                    shapes.forEach(shape => {
+                        allCombinations.push({ color, shape });
+                    });
+                });
+                
+                const shuffledCombinations = shuffleArray(allCombinations);
 
-            colors.forEach(colorName => {
-                const button = document.createElement('button');
-                button.className = 'color-option';
-                button.style.backgroundColor = COLORS[colorName];
-                button.setAttribute('data-color', colorName);
-                button.addEventListener('click', handleChoice);
-                optionsContainer.appendChild(button);
-            });
+                shuffledCombinations.forEach(combination => {
+                    const button = document.createElement('button');
+                    button.className = 'color-option shape-option';
+                    button.style.backgroundColor = COLORS[combination.color];
+                    button.setAttribute('data-color', combination.color);
+                    button.setAttribute('data-shape', combination.shape); // NOVO: atributo da forma
+                    button.innerHTML = SHAPES[combination.shape];
+                    button.addEventListener('click', handleChoice);
+                    optionsContainer.appendChild(button);
+                });
+            }
         };
 
         const handleChoice = (event) => {
+            if (!audioInitialized) {
+                initAudio();
+            }
+
             const selectedButton = event.currentTarget;
             const selectedColor = selectedButton.getAttribute('data-color');
             
             optionsContainer.style.pointerEvents = 'none';
             const timeoutDuration = 1000;
 
-            if (selectedColor === targetColor) {
+            let isCorrect = false;
+            if (gameMode === 'colors') {
+                isCorrect = (selectedColor === targetColor);
+            } else {
+                const selectedShape = selectedButton.getAttribute('data-shape');
+                isCorrect = (selectedColor === targetColor && selectedShape === targetShape);
+            }
+
+            if (isCorrect) {
                 score++;
                 updateScoreDisplay();
                 playSound('acerto');
                 selectedButton.classList.add('correct-animation');
                 
-                if (score >= WIN_SCORE) { // <--- VERIFICAÇÃO COM O NOVO VALOR (5)
+                if (score >= WIN_SCORE) { 
                     setTimeout(() => {
                         nextLevel(); 
                         optionsContainer.style.pointerEvents = 'auto';
