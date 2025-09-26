@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aventura das Cores e Formas</title>
+
+    <style>
+        /* =========================================== */
+        /* CSS EMBUTIDO (style.css) */
+        /* =========================================== */
+        :root {
+            /* Cores do Jogo (Fácil alteração) */
+            --color-red: #ff4136;
+            --color-blue: #0074d9;
+            --color-yellow: #ffdc00;
+            --color-green: #2ecc40;
+            --color-orange: #ff8c00; 
+            --color-purple: #800080; 
+            --color-background: #f0f8ff; 
+            --color-success: #ff851b;
+        }
+
+        body {
+            font-family: sans-serif;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background-color: var(--color-background);
+            user-select: none;
+        }
+
+        .game-container {
+            width: 100%;
+            max-width: 800px;
+            text-align: center;
+        }
+
+        .score-display {
+            font-size: 24px;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 20px;
+            padding: 10px;
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .instruction-area {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-bottom: 40px;
+        }
+
+        .robo-to {
+            font-size: 80px; 
+            margin-bottom: 15px;
+            transition: transform 0.5s ease-in-out;
+        }
+
+        .target-indicator {
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            border: 8px dashed #333;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 40px;
+            font-weight: bold;
+            color: white;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            transition: transform 0.3s ease;
+        }
+
+        .options-container {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 30px;
+            transition: grid-template-columns 0.3s ease;
+        }
+
+        .color-option {
+            width: 100%;
+            padding-bottom: 100%; 
+            border: none;
+            border-radius: 20px;
+            cursor: pointer;
+            transition: transform 0.1s ease, opacity 0.3s ease;
+            box-shadow: 0 8px 0 rgba(0, 0, 0, 0.2);
+            position: relative;
+        }
+
+        /* Classe para os botões de Cor e Forma */
+        .shape-option {
+            border-radius: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        /* Estilo para as formas SVG */
+        .shape-svg {
+            width: 70%;
+            height: 70%;
+            fill: white; /* Cor da forma (o fundo do botão terá a cor principal) */
+        }
+
+        .color-option:active {
+            transform: translateY(4px); 
+            box-shadow: 0 4px 0 rgba(0, 0, 0, 0.2);
+        }
+
+        .correct-animation {
+            animation: bounceScale 0.5s ease forwards;
+        }
+
+        @keyframes bounceScale {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+
+        .wrong-shake {
+            animation: shake 0.3s ease-in-out;
+        }
+
+        @keyframes shake {
+            0% { transform: translateX(0); }
+            25% { transform: translateX(-10px); }
+            50% { transform: translateX(10px); }
+            75% { transform: translateX(-5px); }
+            100% { transform: translateX(0); }
+        }
+
+        .feedback-message {
+            font-size: 40px;
+            font-weight: bold;
+            color: var(--color-success);
+            margin-top: 30px;
+            min-height: 50px;
+        }
+
+        @media (min-width: 600px) {
+            .options-container {
+                grid-template-columns: repeat(4, 1fr); 
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <main class="game-container">
+        
+        <div id="score-display" class="score-display">Pontos: 0</div>
+        
+        <header class="instruction-area">
+            <div id="robo-to" class="robo-to">🤖</div>
+            <div id="target-indicator" class="target-indicator">?</div>
+        </header>
+
+        <section id="options-container" class="options-container">
+            </section>
+
+        <div id="feedback-message" class="feedback-message"></div>
+
+    </main>
+
+    <script>
+        /* =========================================== */
+        /* JAVASCRIPT EMBUTIDO (script.js) - Versão com Cores e Formas */
+        /* =========================================== */
+
+        // ===========================================
+        // CONFIGURAÇÕES GLOBAIS
+        // ===========================================
+        const COLORS = {
+            'vermelho': '#ff4136', 
+            'azul': '#0074d9',
+            'amarelo': '#ffdc00',
+            'verde': '#2ecc40',
+            'laranja': '#ff8c00', 
+            'roxo': '#800080',    
+        };
+
+        // NOVO: DEFINIÇÃO DE FORMAS (usando SVG)
+        const SHAPES = {
+            'quadrado': `<svg class="shape-svg" viewBox="0 0 100 100"><rect x="10" y="10" width="80" height="80"/></svg>`,
+            'triangulo': `<svg class="shape-svg" viewBox="0 0 100 100"><polygon points="50,10 90,90 10,90"/></svg>`,
+            'circulo': `<svg class="shape-svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="40"/></svg>`,
+        };
+
+        const ALL_COLORS = Object.keys(COLORS);
+        const ALL_SHAPES = Object.keys(SHAPES);
+        const WIN_SCORE = 5; 
+        let score = 0;
+        let targetColor = '';
+        let targetShape = ''; // NOVO: ALVO DA FORMA
+        let gameMode = 'colors'; // NOVO: VARIÁVEL DE ESTADO DO JOGO ('colors' ou 'shapes')
+
+        let audioInitialized = false; 
+        let audioAcerto = null; 
+        let audioErro = null;
+        let audioNivelUp = null;
+
+        let currentLevelColors = ALL_COLORS.slice(0, 3); 
+        let currentLevelShapes = ALL_SHAPES.slice(0, 3);
+
+        // ===========================================
+        // SELETORES DO DOM
+        // ===========================================
+        const optionsContainer = document.getElementById('options-container');
+        const targetIndicator = document.getElementById('target-indicator');
+        const feedbackMessage = document.getElementById('feedback-message');
+        const scoreDisplay = document.getElementById('score-display'); 
+
+        // ===========================================
+        // FUNÇÕES DE ÁUDIO E FEEDBACK
+        // ===========================================
+        const initAudio = () => {
+            if (audioInitialized) return;
+            audioAcerto = new Audio('sounds/acerto.mp3'); 
+            audioErro = new Audio('sounds/erro.mp3');
+            audioNivelUp = new Audio('sounds/nivel_up.mp3');
+            try {
+                const unlockAudio = new Audio();
+                unlockAudio.muted = true;
+                unlockAudio.play();
+            } catch (e) {
+                console.log("Erro ao tentar destravar o áudio:", e);
+            }
+            audioInitialized = true;
+        };
+
+        const getAudioFile = (type) => {
+             if (type === 'acerto') return audioAcerto;
+             if (type === 'erro') return audioErro;
+             if (type === 'nivel_up') return audioNivelUp;
+             return null;
+        }
+        
+        const updateScoreDisplay = () => {
+            scoreDisplay.textContent = `Pontos: ${score}`;
+        };
+
+        const playSound = (type) => {
+            if (!audioInitialized) return;
+            const audio = getAudioFile(type);
+            if (audio) {
+                 audio.currentTime = 0; 
+                 audio.play().catch(e => {});
+            }
+            
+            if (type === 'acerto') {
+                feedbackMessage.textContent = '🥳 ACERTOU! 🌟';
+                setTimeout(() => feedbackMessage.textContent = '', 800);
+            } else if (type === 'erro') {
+                feedbackMessage.textContent = '❌ Tente Novamente!';
+                setTimeout(() => feedbackMessage.textContent = '', 800);
+            } else if (type === 'nivel_up') {
+                feedbackMessage.textContent = '🚀 NOVO NÍVEL DESBLOQUEADO!';
+                document.getElementById('robo-to').style.transform = 'scale(1.2) rotate(360deg)'; 
+                setTimeout(() => {
+                    feedbackMessage.textContent = '';
+                    document.getElementById('robo-to').style.transform = 'none';
+                }, 1500);
+            }
+        };
+
+        // ===========================================
+        // LÓGICA DE PROGRESSÃO
+        // ===========================================
+        const nextLevel = () => {
+            playSound('nivel_up');
+            
+            // VERIFICA SE ESTÁ NO FIM DA FASE DE CORES PARA MUDAR PARA A FASE DE FORMAS
+            if (gameMode === 'colors' && currentLevelColors.length === ALL_COLORS.length) {
+                gameMode = 'shapes';
+                score = 0;
+                updateScoreDisplay();
+                feedbackMessage.textContent = '✨ Agora, associe a Cor E a Forma! ✨';
+                setTimeout(() => {
+                    feedbackMessage.textContent = '';
+                    startRound();
+                }, 2000);
+                return;
+            }
+
+            // Lógica para avançar a fase de cores
+            if (gameMode === 'colors' && currentLevelColors.length < ALL_COLORS.length) {
+                currentLevelColors = ALL_COLORS.slice(0, currentLevelColors.length + 1); 
+            }
+            
+            score = 0;
+            updateScoreDisplay();
+            startRound();
+        };
+
+        // ===========================================
+        // LÓGICA DO JOGO UNIFICADA PARA CORES E FORMAS
+        // ===========================================
+
+        const shuffleArray = (array) => {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+            return array;
+        };
+
+        const startRound = () => {
+            const availableColors = shuffleArray([...currentLevelColors]); 
+            targetColor = availableColors[Math.floor(Math.random() * availableColors.length)];
+            
+            // Lógica para a fase de formas
+            if (gameMode === 'shapes') {
+                const availableShapes = shuffleArray([...currentLevelShapes]);
+                targetShape = availableShapes[Math.floor(Math.random() * availableShapes.length)];
+
+                // Atualiza o indicador do alvo para mostrar a forma e a cor
+                targetIndicator.innerHTML = SHAPES[targetShape];
+                targetIndicator.style.backgroundColor = COLORS[targetColor];
+                targetIndicator.style.borderRadius = '20px'; // Para acomodar o quadrado
+            } else {
+                // Lógica para a fase de cores
+                targetIndicator.textContent = '❓';
+                targetIndicator.innerHTML = '';
+                targetIndicator.style.backgroundColor = COLORS[targetColor];
+                targetIndicator.style.borderRadius = '50%';
+            }
+
+            renderOptions(availableColors, ALL_SHAPES);
+        };
+
+        const renderOptions = (colors, shapes) => {
+            optionsContainer.innerHTML = ''; 
+            
+            // Ajusta o grid para 4 colunas se for a fase de cores ou formas
+            optionsContainer.style.gridTemplateColumns = `repeat(4, 1fr)`;
+            
+            if (gameMode === 'colors') {
+                // Cria opções apenas de cores
+                colors.forEach(colorName => {
+                    const button = document.createElement('button');
+                    button.className = 'color-option';
+                    button.style.backgroundColor = COLORS[colorName];
+                    button.setAttribute('data-color', colorName);
+                    button.addEventListener('click', handleChoice);
+                    optionsContainer.appendChild(button);
+                });
+            } else {
+                // Cria opções com cores e formas
+                const allCombinations = [];
+                colors.forEach(color => {
+                    shapes.forEach(shape => {
+                        allCombinations.push({ color, shape });
+                    });
+                });
+                
+                const shuffledCombinations = shuffleArray(allCombinations);
+
+                shuffledCombinations.forEach(combination => {
+                    const button = document.createElement('button');
+                    button.className = 'color-option shape-option';
+                    button.style.backgroundColor = COLORS[combination.color];
+                    button.setAttribute('data-color', combination.color);
+                    button.setAttribute('data-shape', combination.shape); // NOVO: atributo da forma
+                    button.innerHTML = SHAPES[combination.shape];
+                    button.addEventListener('click', handleChoice);
+                    optionsContainer.appendChild(button);
+                });
+            }
+        };
+
+        const handleChoice = (event) => {
+            if (!audioInitialized) {
+                initAudio();
+            }
+
+            const selectedButton = event.currentTarget;
+            const selectedColor = selectedButton.getAttribute('data-color');
+            
+            optionsContainer.style.pointerEvents = 'none';
+            const timeoutDuration = 1000;
+
+            let isCorrect = false;
+            if (gameMode === 'colors') {
+                isCorrect = (selectedColor === targetColor);
+            } else {
+                const selectedShape = selectedButton.getAttribute('data-shape');
+                isCorrect = (selectedColor === targetColor && selectedShape === targetShape);
+            }
+
+            if (isCorrect) {
+                score++;
+                updateScoreDisplay();
+                playSound('acerto');
+                selectedButton.classList.add('correct-animation');
+                
+                if (score >= WIN_SCORE) { 
+                    setTimeout(() => {
+                        nextLevel(); 
+                        optionsContainer.style.pointerEvents = 'auto';
+                    }, timeoutDuration);
+                } else {
+                    setTimeout(() => {
+                        selectedButton.classList.remove('correct-animation');
+                        optionsContainer.style.pointerEvents = 'auto';
+                        startRound(); 
+                    }, timeoutDuration);
+                }
+
+            } else {
+                playSound('erro');
+                selectedButton.classList.add('wrong-shake');
+                
+                setTimeout(() => {
+                    selectedButton.classList.remove('wrong-shake');
+                    optionsContainer.style.pointerEvents = 'auto'; 
+                }, 500);
+            }
+        };
+
+        // ===========================================
+        // INICIALIZAÇÃO
+        // ===========================================
+        document.addEventListener('DOMContentLoaded', () => {
+            updateScoreDisplay(); 
+            startRound();
+        });
+    </script>
+</body>
+</html>
